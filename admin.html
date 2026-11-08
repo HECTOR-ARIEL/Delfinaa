@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>DELFI — Mis productos</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+  <div class="aviso" id="aviso-demo" hidden>
+    Modo prueba: lo que cargues se guarda solo en esta compu.
+    <button class="btn chico" id="btn-reiniciar" type="button">Empezar de cero</button>
+  </div>
+
+  <!-- Entrar -->
+  <div class="login" id="login" hidden>
+    <div class="caja-blanca">
+      <span class="logo">DEL<span>FI</span></span>
+      <p class="muted" style="text-align:center;font-weight:700">Para cambiar los productos de la página</p>
+      <form id="form-login">
+        <label for="l-email">Email</label><input id="l-email" type="email" required autocomplete="username">
+        <label for="l-pass">Contraseña</label><input id="l-pass" type="password" required autocomplete="current-password">
+        <div class="modal-pie"><button class="btn primario grande" type="submit">Entrar</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div id="app" hidden>
+    <header class="cabecera">
+      <a class="logo" href="index.html" target="_blank" title="Ver la página">DEL<span>FI</span></a>
+      <div style="display:flex;gap:8px">
+        <a class="btn chico" href="index.html" target="_blank">👀 Ver la página</a>
+        <button class="btn chico" id="btn-salir" type="button">Salir</button>
+      </div>
+    </header>
+
+    <main class="panel">
+      <h1 style="margin:0">Mis productos</h1>
+      <button class="btn primario grande" id="btn-nuevo" type="button">➕ Agregar un producto</button>
+      <div class="barra"><input id="buscar" type="search" placeholder="🔎 Buscar…" aria-label="Buscar producto"></div>
+      <p class="muted" style="margin:0;font-weight:700">Tocá un producto para cambiarle la foto, el precio o los talles.</p>
+      <div class="lista" id="lista"></div>
+    </main>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+  <script src="comun.js"></script>
+  <script src="db.js"></script>
+  <script>
+    let productos = [];
+
+    async function iniciar() {
+      if (DB.modo === 'demo') { $('#aviso-demo').hidden = false; $('#btn-salir').hidden = true; }
+      let ses = null;
+      try { ses = await DB.auth.sesion(); } catch (err) { toast(err.message, 'error'); }
+      if (ses) mostrar(); else $('#login').hidden = false;
+    }
+    $('#form-login').addEventListener('submit', async e => {
+      e.preventDefault();
+      try {
+        await DB.auth.login($('#l-email').value.trim(), $('#l-pass').value);
+        $('#login').hidden = true;
+        mostrar();
+      } catch (err) { toast('El email o la contraseña no son correctos', 'error'); }
+    });
+    $('#btn-salir').addEventListener('click', async () => { await DB.auth.logout(); location.reload(); });
+    $('#btn-reiniciar').addEventListener('click', () => {
+      if (!confirm('¿Borrar todo lo que cargaste y volver a los productos de ejemplo?')) return;
+      DB.reiniciarPrueba();
+      location.reload();
+    });
+
+    async function mostrar() {
+      $('#app').hidden = false;
+      await recargar();
+    }
+    async function recargar() {
+      try { productos = await DB.productos.listar(); } catch (err) { toast(err.message, 'error'); }
+      dibujar();
+    }
+    function dibujar() {
+      const q = $('#buscar').value.trim().toLowerCase();
+      const lista = productos.filter(p => !q || p.nombre.toLowerCase().includes(q));
+      $('#lista').innerHTML = lista.length ? lista.map(p => `
+        <button type="button" class="prod ${p.activo ? '' : 'oculto'}" data-id="${p.id}">
+          ${fotoHTML(p, 'foto')}
+          <div class="info">
+            <strong>${esc(p.nombre)}</strong>
+            <span class="precio">${fmt(p.precio)}</span>
+            ${p.activo ? '' : '<span class="etiqueta">No se ve en la página</span>'}
+          </div>
+        </button>`).join('')
+        : `<p class="muted" style="grid-column:1/-1;font-weight:700">${q ? 'No encontré ese producto.' : 'Todavía no hay productos. Tocá “Agregar un producto”.'}</p>`;
+    }
+    $('#buscar').addEventListener('input', dibujar);
+    $('#btn-nuevo').addEventListener('click', () => editar(null));
+    $('#lista').addEventListener('click', e => {
+      const b = e.target.closest('[data-id]');
+      if (b) editar(productos.find(p => p.id === b.dataset.id));
+    });
+
+    function editar(prod) {
+      const p = prod ? { ...prod, talles: [...(prod.talles || [])] } : { nombre: '', categoria: 'zapatilla', precio: '', talles: [], colores: '', descripcion: '', foto_url: '', activo: true };
+      let fotoNueva = null;
+      const m = abrirModal(`
+        <h2>${prod ? 'Cambiar producto' : 'Producto nuevo'}</h2>
+        <form id="f">
+          <div id="foto-prev"></div>
+          <div class="foto-botones">
+            <label class="btn" style="margin:0">📷 Sacar foto<input type="file" accept="image/*" capture="environment" hidden data-foto></label>
+            <label class="btn" style="margin:0">🖼️ Elegir foto<input type="file" accept="image/*" hidden data-foto></label>
+          </div>
+
+          <label>¿Qué es?</label>
+          <div class="dos-botones" id="tipo">
+            <button type="button" class="opcion" data-tipo="zapatilla">👟 Zapatilla</button>
+            <button type="button" class="opcion" data-tipo="ojota">🩴 Ojota</button>
+          </div>
+
+          <label for="f-nombre">Nombre</label>
+          <input id="f-nombre" required value="${esc(p.nombre)}" placeholder="Ej: Zapatilla Nike blanca">
+
+          <label for="f-precio">Precio</label>
+          <div class="precio-input"><span>$</span><input id="f-precio" inputmode="numeric" required value="${p.precio === '' ? '' : Math.round(p.precio)}" placeholder="0"></div>
+
+          <label>Talles que hay <span class="ayuda">— tocá los que tenés</span></label>
+          <div class="talles-grilla" id="talles"></div>
+          <div class="chips" style="margin-top:8px">
+            <button type="button" class="btn chico" id="t-todos">Marcar todos</button>
+            <button type="button" class="btn chico" id="t-ninguno">Sacar todos</button>
+          </div>
+
+          <label for="f-colores">Colores <span class="ayuda">— si querés</span></label>
+          <input id="f-colores" value="${esc(p.colores)}" placeholder="Ej: Negro, Blanco, Rosa">
+
+          <label for="f-desc">Algo más para contar <span class="ayuda">— si querés</span></label>
+          <textarea id="f-desc" placeholder="Ej: Muy cómodas, suela de goma">${esc(p.descripcion)}</textarea>
+
+          <label class="interruptor"><input type="checkbox" id="f-activo" ${p.activo ? 'checked' : ''}> Que se vea en la página</label>
+
+          <div class="modal-pie">
+            <button type="submit" class="btn primario grande">💾 Guardar</button>
+            ${prod ? '<button type="button" class="btn peligro" id="f-borrar">🗑️ Borrar este producto</button>' : ''}
+          </div>
+        </form>`);
+
+      const pintarFoto = () => {
+        const src = fotoNueva ? URL.createObjectURL(fotoNueva) : p.foto_url;
+        $('#foto-prev', m).innerHTML = src
+          ? `<img class="foto-grande" src="${esc(src)}" alt="">`
+          : `<div class="foto-grande sin-foto" aria-hidden="true">${p.categoria === 'ojota' ? '🩴' : '👟'}</div>`;
+      };
+      const pintarTipo = () => {
+        $$('[data-tipo]', m).forEach(b => b.classList.toggle('activo', b.dataset.tipo === p.categoria));
+        // muestra los talles de ese tipo, más los que ya tenía marcados de otro tipo
+        const opciones = [...new Set([...TALLES[p.categoria], ...p.talles])].sort(ordenTalle);
+        $('#talles', m).innerHTML = opciones.map(t => `<button type="button" class="chip ${p.talles.includes(t) ? 'activo' : ''}" data-talle="${esc(t)}">${esc(t)}</button>`).join('');
+        pintarFoto();
+      };
+      pintarTipo();
+
+      m.addEventListener('click', e => {
+        const b = e.target.closest('button');
+        if (!b) return;
+        if (b.dataset.tipo) {
+          if (b.dataset.tipo !== p.categoria) { p.categoria = b.dataset.tipo; p.talles = []; }
+          pintarTipo();
+        } else if (b.dataset.talle !== undefined) {
+          const t = b.dataset.talle;
+          p.talles = p.talles.includes(t) ? p.talles.filter(x => x !== t) : [...p.talles, t];
+          b.classList.toggle('activo');
+        } else if (b.id === 't-todos') { p.talles = [...TALLES[p.categoria]]; pintarTipo(); }
+        else if (b.id === 't-ninguno') { p.talles = []; pintarTipo(); }
+      });
+      $$('[data-foto]', m).forEach(inp => inp.addEventListener('change', () => {
+        if (inp.files[0]) { fotoNueva = inp.files[0]; pintarFoto(); }
+      }));
+
+      if (prod) $('#f-borrar', m).addEventListener('click', async () => {
+        if (!confirm(`¿Seguro que querés borrar “${prod.nombre}”?\n\nSi solo querés que no se vea un tiempo, sacale la tilde a “Que se vea en la página”.`)) return;
+        try { await DB.productos.borrar(prod.id); cerrarModal(); toast('Producto borrado'); recargar(); }
+        catch (err) { toast(err.message, 'error'); }
+      });
+
+      $('#f', m).addEventListener('submit', async e => {
+        e.preventDefault();
+        const boton = $('#f button[type="submit"]', m);
+        if (!num($('#f-precio', m).value) && !confirm('El precio está en $0. ¿Guardar igual?')) return;
+        boton.disabled = true;
+        boton.textContent = 'Guardando…';
+        try {
+          if (fotoNueva) p.foto_url = await DB.productos.subirFoto(await achicarImagen(fotoNueva));
+          Object.assign(p, {
+            nombre: $('#f-nombre', m).value,
+            precio: num($('#f-precio', m).value),
+            colores: $('#f-colores', m).value,
+            descripcion: $('#f-desc', m).value,
+            activo: $('#f-activo', m).checked,
+          });
+          await DB.productos.guardar(p);
+          cerrarModal();
+          toast('¡Listo, guardado! ✨');
+          recargar();
+        } catch (err) {
+          toast(err.message, 'error');
+          boton.disabled = false;
+          boton.textContent = '💾 Guardar';
+        }
+      });
+    }
+
+    iniciar();
+  </script>
+</body>
+</html>

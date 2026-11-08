@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DELFI — Zapatillas y ojotas</title>
+  <meta name="description" content="Catálogo de zapatillas y ojotas de DELFI. Elegí tu talle y pedilo por WhatsApp.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+  <div class="aviso" id="aviso-demo" hidden>Modo prueba: estos productos son de ejemplo.</div>
+
+  <header class="cabecera">
+    <div class="logo">DEL<span>FI</span></div>
+    <button class="btn chico" id="btn-carrito" type="button">🛍️ Mi pedido <span class="contador" id="contador">0</span></button>
+  </header>
+
+  <section class="hero">
+    <h1>Zapatillas y ojotas para toda la familia 💕</h1>
+    <p>Elegí el modelo y tu talle, y pedilo por WhatsApp.</p>
+  </section>
+
+  <section class="filtros">
+    <div class="chips" id="f-cat">
+      <button class="chip activo" data-cat="">Todo</button>
+      <button class="chip" data-cat="zapatilla">👟 Zapatillas</button>
+      <button class="chip" data-cat="ojota">🩴 Ojotas</button>
+    </div>
+    <div class="fila">
+      <input id="f-buscar" type="search" placeholder="🔎 Buscar…" aria-label="Buscar">
+      <select id="f-talle" aria-label="Tu talle"><option value="">Todos los talles</option></select>
+    </div>
+  </section>
+
+  <main class="grilla" id="grilla"><p class="vacio">Cargando…</p></main>
+
+  <div class="barra-carrito" id="barra-carrito" hidden>
+    <button class="btn primario grande" id="btn-barra" type="button"></button>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+  <script src="comun.js"></script>
+  <script src="db.js"></script>
+  <script>
+    const CFG = window.DELFI_CONFIG;
+    const E = { productos: [], cat: '', q: '', talle: '' };
+    const CLAVE = 'delfi_carrito_v2';
+    let carrito = [];
+    try { carrito = JSON.parse(localStorage.getItem(CLAVE)) || []; } catch (e) { carrito = []; }
+    const guardarCarrito = () => { try { localStorage.setItem(CLAVE, JSON.stringify(carrito)); } catch (e) {} actualizarCarrito(); };
+    const totalCarrito = () => carrito.reduce((s, i) => s + i.precio * i.cantidad, 0);
+
+    async function iniciar() {
+      if (DB.modo === 'demo') $('#aviso-demo').hidden = false;
+      try {
+        E.productos = await DB.productos.listar({ soloVisibles: true });
+      } catch (err) {
+        $('#grilla').innerHTML = '<p class="vacio">No se pudo cargar el catálogo. Probá de nuevo en un rato.</p>';
+        return;
+      }
+      const talles = [...new Set(E.productos.flatMap(p => p.talles || []))].sort(ordenTalle);
+      $('#f-talle').insertAdjacentHTML('beforeend', talles.map(t => `<option>${esc(t)}</option>`).join(''));
+      dibujar();
+      actualizarCarrito();
+    }
+
+    function dibujar() {
+      const q = E.q.toLowerCase();
+      const lista = E.productos.filter(p =>
+        (!E.cat || p.categoria === E.cat) &&
+        (!q || p.nombre.toLowerCase().includes(q)) &&
+        (!E.talle || (p.talles || []).includes(E.talle)));
+      $('#grilla').innerHTML = lista.length ? lista.map(p => `
+        <button class="card" type="button" data-id="${p.id}">
+          ${fotoHTML(p, 'foto')}
+          <div class="info">
+            <span class="nombre">${esc(p.nombre)}</span>
+            <span class="precio">${fmt(p.precio)}</span>
+            <span class="talles">${esc(textoTalles(p.talles))}</span>
+          </div>
+        </button>`).join('')
+        : `<p class="vacio">${E.productos.length ? 'No encontramos productos con ese filtro.' : 'Muy pronto vas a ver nuestros productos acá 💕'}</p>`;
+    }
+
+    function verProducto(p) {
+      const colores = listaColores(p);
+      const talles = p.talles || [];
+      const sel = { color: colores.length === 1 ? colores[0] : '', talle: talles.includes(E.talle) ? E.talle : '', cant: 1 };
+      const m = abrirModal(`
+        ${fotoHTML(p, 'detalle-foto')}
+        <h2>${esc(p.nombre)}</h2>
+        <div class="precio" style="font-size:1.5rem">${fmt(p.precio)}</div>
+        ${p.descripcion ? `<p class="muted" style="font-weight:600">${esc(p.descripcion)}</p>` : ''}
+        ${colores.length > 1 ? `<label>Color</label><div class="chips" id="d-colores"></div>` : colores.length ? `<p><strong>Color:</strong> ${esc(colores[0])}</p>` : ''}
+        ${talles.length ? `<label>Talle</label><div class="chips" id="d-talles"></div>` : ''}
+        <label>Cantidad</label>
+        <div class="cantidad"><button type="button" data-c="-1" aria-label="Menos">−</button><span id="d-cant">1</span><button type="button" data-c="1" aria-label="Más">+</button></div>
+        <div class="modal-pie"><button class="btn primario grande" id="d-agregar" type="button"></button></div>`);
+      const pintar = () => {
+        if (colores.length > 1) $('#d-colores', m).innerHTML = colores.map(c => `<button type="button" class="chip ${c === sel.color ? 'activo' : ''}" data-color="${esc(c)}">${esc(c)}</button>`).join('');
+        if (talles.length) $('#d-talles', m).innerHTML = talles.map(t => `<button type="button" class="chip ${t === sel.talle ? 'activo' : ''}" data-talle="${esc(t)}">${esc(t)}</button>`).join('');
+        $('#d-cant', m).textContent = sel.cant;
+        const falta = (talles.length && !sel.talle) ? 'Elegí tu talle' : (colores.length > 1 && !sel.color) ? 'Elegí el color' : '';
+        $('#d-agregar', m).textContent = falta || `Agregar al pedido · ${fmt(p.precio * sel.cant)}`;
+        $('#d-agregar', m).disabled = !!falta;
+      };
+      m.addEventListener('click', e => {
+        const b = e.target.closest('button');
+        if (!b) return;
+        if (b.dataset.color !== undefined) { sel.color = b.dataset.color; pintar(); }
+        else if (b.dataset.talle !== undefined) { sel.talle = b.dataset.talle; pintar(); }
+        else if (b.dataset.c) { sel.cant = Math.max(1, Math.min(20, sel.cant + Number(b.dataset.c))); pintar(); }
+        else if (b.id === 'd-agregar') {
+          const ya = carrito.find(i => i.id === p.id && i.talle === sel.talle && i.color === sel.color);
+          if (ya) ya.cantidad += sel.cant;
+          else carrito.push({ id: p.id, nombre: p.nombre, categoria: p.categoria, foto_url: p.foto_url, precio: Number(p.precio), talle: sel.talle, color: sel.color, cantidad: sel.cant });
+          guardarCarrito();
+          cerrarModal();
+          toast('¡Agregado a tu pedido! 💕');
+        }
+      });
+      pintar();
+    }
+
+    function actualizarCarrito() {
+      const n = carrito.reduce((s, i) => s + i.cantidad, 0);
+      $('#contador').textContent = n;
+      $('#barra-carrito').hidden = !n;
+      $('#btn-barra').textContent = `Ver mi pedido (${n}) · ${fmt(totalCarrito())}`;
+    }
+
+    function verCarrito() {
+      if (!carrito.length) { toast('Todavía no agregaste nada'); return; }
+      const m = abrirModal(`<h2>Mi pedido</h2><div id="c-items"></div>
+        <div class="total-fila"><span>Total</span><span id="c-total"></span></div>
+        <form id="c-form">
+          <label for="c-nombre">Tu nombre</label><input id="c-nombre" required autocomplete="name">
+          <div class="modal-pie"><button class="btn verde grande" type="submit">💬 Enviar pedido por WhatsApp</button></div>
+        </form>`);
+      const pintar = () => {
+        if (!carrito.length) { cerrarModal(); return; }
+        $('#c-items', m).innerHTML = carrito.map((i, k) => `<div class="item-carrito">
+          ${fotoHTML(i, 'mini')}
+          <div class="txt"><strong>${esc(i.nombre)}</strong>
+            <div class="muted">${i.talle ? 'Talle ' + esc(i.talle) : ''}${i.talle && i.color ? ' · ' : ''}${esc(i.color)}</div>
+            <div>${fmt(i.precio * i.cantidad)}</div></div>
+          <div class="cantidad"><button type="button" data-k="${k}" data-c="-1" aria-label="Menos">−</button><span>${i.cantidad}</span><button type="button" data-k="${k}" data-c="1" aria-label="Más">+</button></div>
+        </div>`).join('');
+        $('#c-total', m).textContent = fmt(totalCarrito());
+      };
+      m.addEventListener('click', e => {
+        const b = e.target.closest('button[data-k]');
+        if (!b) return;
+        const i = carrito[b.dataset.k];
+        i.cantidad += Number(b.dataset.c);
+        if (i.cantidad <= 0) carrito.splice(b.dataset.k, 1);
+        guardarCarrito();
+        pintar();
+      });
+      $('#c-form', m).addEventListener('submit', e => {
+        e.preventDefault();
+        const numero = String(CFG.WHATSAPP || '').replace(/\D/g, '');
+        if (!numero) { toast('Falta poner el WhatsApp del local en config.js', 'error'); return; }
+        const nombre = $('#c-nombre', m).value.trim();
+        const texto = `¡Hola ${CFG.NOMBRE}! Soy ${nombre} y quiero pedir:\n` +
+          carrito.map(i => `• ${i.nombre}${i.talle ? ' — talle ' + i.talle : ''}${i.color ? ', ' + i.color : ''} x${i.cantidad} (${fmt(i.precio * i.cantidad)})`).join('\n') +
+          `\nTotal: ${fmt(totalCarrito())}`;
+        window.open(`https://wa.me/${numero}?text=${encodeURIComponent(texto)}`, '_blank');
+        carrito = [];
+        guardarCarrito();
+        abrirModal(`<h2>¡Gracias, ${esc(nombre)}! 💕</h2>
+          <p style="font-weight:600">Se abrió WhatsApp con tu pedido. Solo tenés que apretar <strong>Enviar</strong> y te respondemos enseguida.</p>
+          <div class="modal-pie"><button class="btn primario" type="button" data-cerrar>Seguir mirando</button></div>`);
+      });
+      pintar();
+    }
+
+    $('#f-cat').addEventListener('click', e => {
+      const b = e.target.closest('[data-cat]');
+      if (!b) return;
+      E.cat = b.dataset.cat;
+      $$('#f-cat .chip').forEach(c => c.classList.toggle('activo', c === b));
+      dibujar();
+    });
+    $('#f-buscar').addEventListener('input', e => { E.q = e.target.value; dibujar(); });
+    $('#f-talle').addEventListener('change', e => { E.talle = e.target.value; dibujar(); });
+    $('#grilla').addEventListener('click', e => {
+      const c = e.target.closest('.card');
+      if (c) verProducto(E.productos.find(p => p.id === c.dataset.id));
+    });
+    $('#btn-carrito').addEventListener('click', verCarrito);
+    $('#btn-barra').addEventListener('click', verCarrito);
+    iniciar();
+  </script>
+</body>
+</html>
