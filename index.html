@@ -1,150 +1,207 @@
-<!doctype html><html lang="es"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>Catálogo</title>
-<link rel="icon" href="icon.svg"><link rel="stylesheet" href="estilos.css"><script src="tema.js"></script><meta name="theme-color" content="#0d0d0d">
-<style>
-.top{position:sticky;top:var(--hh,75px);z-index:4;display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:-16px -34px 0 -16px;padding:12px 34px 12px 16px;background:var(--bg);border-bottom:1px solid var(--b)}
-#mas{display:block;margin:18px auto 0}.card .cod{font-size:14px;font-weight:600;color:var(--t);opacity:.75}.card{scroll-margin-top:calc(var(--hh,75px) + var(--th,76px))}
-/* sectores: botones que se deslizan de lado */
-.chips{flex-basis:100%;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}.chips::-webkit-scrollbar{display:none}
-.chips button{flex:none;padding:6px 14px;border-radius:99px;font-size:14px;background:var(--c);color:var(--t);border:1px solid var(--b)}
-.chips button.on{background:var(--a);color:#fff;border-color:var(--a)}
-@media(max-width:520px){.top{margin:-12px -34px 0 -12px;padding:10px 34px 10px 12px}.top .m{font-size:12px}.bus{min-width:0}}
-/* carrito: botón en la cabecera, controles en cada tarjeta y ventana con el pedido */
-#car{position:relative}#car .nb{min-width:20px;height:20px;padding:0 6px;border-radius:99px;background:var(--a);color:#fff;font-size:12px;font-weight:700;display:inline-grid;place-items:center}
-@media(max-width:520px){#car .tx{display:none}}
-.mn{align-self:flex-start;font-size:12px;font-weight:700;color:var(--a);border:1px solid currentColor;border-radius:99px;padding:1px 8px}
-.add{margin-top:6px}.add .agr{width:100%;padding:8px}
-.step{display:flex;align-items:center;gap:4px}.step button{width:36px;height:36px;padding:0;flex:none;font-size:20px;line-height:1}
-.step input{flex:1;min-width:0;width:0;text-align:center;padding:7px 2px;font-weight:600}
-dialog{border:0;border-radius:12px;padding:0;width:min(560px,calc(100% - 24px));max-height:calc(100% - 24px);overflow:auto;background:var(--c);color:var(--t)}
-dialog::backdrop{background:rgba(0,0,0,.45)}dialog form,#cok{display:grid;gap:12px;padding:18px}dialog h2{margin:0;font-size:18px}
-.dh{display:flex;align-items:center;justify-content:space-between;gap:8px}.dh button{width:38px;height:38px;padding:0}
-label{display:grid;gap:4px;font-size:13px;color:var(--m)}
-.cl{display:grid;gap:0}.cl>div{display:grid;grid-template-columns:1fr auto;gap:6px 10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--b)}
-.cl .nm{font-size:14px;overflow-wrap:anywhere}.cl .nm small{display:block;color:var(--m);font-size:12px}.cl .st{grid-column:1;max-width:150px}
-.cl .sb{font-weight:700;text-align:right;white-space:nowrap}.cl .q{color:var(--no);font-size:12px;font-weight:600;grid-column:1/-1}
-.tot{font-size:20px;text-align:right}.acc{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}.acc .s:first-child{margin-right:auto}
-#cok{text-align:center;justify-items:center}#cok .ok{font-size:40px;width:64px;height:64px;border-radius:99px;display:grid;place-items:center;background:var(--a);color:#fff}
-</style></head><body>
-<header><div class="brand"><img src="logo.jpg" alt="Distribuidor DEC"><h1 id="tit">Catálogo</h1></div><div class="datos"><b>Héctor Ariel De Cia</b><span>Alias: <b class="sel">distri.dec</b></span><a href="tel:+543516522035">Tel: 351-6522-035</a></div>
-<div class="r"><button id="tema" class="s" onclick="cambiarTema()">◐</button><button id="car" class="s" onclick="abrirCarrito()" title="Ver el carrito y pedir presupuesto">🛒<span class="tx"> Carrito</span><span class="nb" id="nb" hidden>0</span></button><a class="btn s" href="admin.html">Administrar</a></div></header>
-<main class="con-abc"><nav class="abc" id="abc" aria-label="Índice alfabético"></nav>
-<div class="top"><div class="bus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
- <input id="q" type="search" enterkeyhint="search" autocomplete="off" placeholder="Nombre o código" aria-label="Buscar productos" oninput="busca()" onkeydown="if(event.key=='Enter')this.blur()">
- <button id="qx" type="button" hidden title="Borrar búsqueda" onclick="$('q').value='';busca();$('q').focus()">✕</button></div><span class="m" id="u"></span><div class="chips" id="chips" hidden></div></div>
-<div class="grid" id="g"></div>
-<p id="mas" class="m" hidden style="text-align:center">Cargando más productos…</p>
-</main>
-<dialog id="dcar"><form id="cform" onsubmit="enviar(event)">
- <div class="dh"><h2>Tu carrito</h2><button type="button" class="s" title="Cerrar" onclick="$('dcar').close()">✕</button></div>
- <div class="cl" id="cl"></div>
- <div id="cdat" style="display:grid;gap:12px">
-  <div class="tot" id="ctot"></div>
-  <label>Nombre y apellido (o comercio)<input id="cn" required maxlength="100" autocomplete="name"></label>
-  <label>Teléfono / WhatsApp<input id="ct" type="tel" required maxlength="40" autocomplete="tel" inputmode="tel" placeholder="351 123 4567"></label>
-  <label>Comentarios (opcional)<textarea id="cc" rows="2" maxlength="1000" placeholder="Ej.: lo retiro el sábado, envío a…"></textarea></label>
-  <p class="m" style="margin:0;font-size:13px">Los precios son orientativos. Preparamos tu presupuesto según el stock y te lo confirmamos por WhatsApp.</p>
-  <div class="acc"><button type="button" class="s" onclick="vaciar()">Vaciar</button><button id="benv">Enviar pedido de presupuesto</button></div>
- </div>
-</form>
-<div id="cok" hidden><div class="ok">✓</div><h2 id="okT"></h2>
- <p class="m" style="margin:0">Ya nos llegó tu pedido y los productos quedaron reservados. Te contactamos al <b id="okTel"></b> con el presupuesto.</p>
- <p id="okFalta" hidden style="margin:0;color:var(--no);font-size:14px;font-weight:600">De algunos productos no había stock suficiente: te confirmamos esas cantidades.</p>
- <a class="btn" id="okWa" target="_blank" rel="noopener">Avisar por WhatsApp</a>
- <button class="s" onclick="$('dcar').close()">Seguir mirando</button></div>
-</dialog>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js"></script>
-<script>
-const sb=supabase.createClient(CFG.URL,CFG.KEY),$=id=>document.getElementById(id);let P=[],lim=48;
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const money=n=>(CFG.MONEDA||'')+' '+Number(n).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});
-// Nombre para el cliente: sin la leyenda del proveedor "(MINIMO 12 UNIDADES)", "MIN 10", "(CAJA CERRADA 50 UNID)"…
-// La compra mínima, si la hay, la decides tú en administración y se muestra aparte.
-const nom=p=>String(p.nombre||'').replace(/\s*[(\[]?\s*\b(?:MIN(?:IM[O0])?\.?|CAJA\s+CERRADA)\s*(?:DE\s*|X\s*)?\d+(?:\s*(?:UNIDADES|UNIDAD|UNID|UNI|UN|U)\b\.?)?\s*[)\]]?/gi,' ').replace(/\s{2,}/g,' ').replace(/[\s\-,]+$/,'').trim()||p.nombre;
-const norm=s=>String(s??'').normalize('NFD').replace(/\p{M}/gu,'').toLowerCase();
-if(CFG.NOMBRE)document.title=CFG.NOMBRE+' · Catálogo';
-// Solo se muestran productos con código propio, visibles y fuera de la papelera.
-// Supabase devuelve como máximo 1000 filas por consulta: pedimos por bloques
-async function todos(q){let out=[];for(let i=0;;i+=1000){const{data,error}=await q().range(i,i+999);if(error)throw error;out=out.concat(data);if(data.length<1000)return out}}
-const pide=c=>()=>sb.from('productos').select(c).eq('activo',true).eq('borrado',false).not('codigo','is',null).neq('codigo','').order('nombre');
-async function load(){
- try{P=await todos(pide('id,codigo,nombre,precio,imagen,stock,sector_id,minimo')).catch(()=>todos(pide('id,codigo,nombre,precio,imagen,stock,sector_id'))).catch(()=>todos(pide('id,codigo,nombre,precio,imagen,stock')))}
- catch(e){$('u').textContent='No se pudo cargar el catálogo.';return}
- const{data}=await sb.from('sectores').select('id,nombre').order('nombre');SEC=data||[];pintaChips();
- r();$('u').textContent=P.length+' productos';pintaCar()}
-function r(){const w=norm($('q').value).split(/\s+/).filter(Boolean);
- const F=P.filter(p=>{const s=norm((p.codigo||'')+' '+p.nombre);return(!sec||p.sector_id==sec)&&w.every(x=>s.includes(x))});
- FL=F;pintaAbc($('abc'),F);if(P.length)$('u').textContent=$('q').value.trim()||sec?`${F.length} de ${P.length}`:P.length+' productos';
- $('g').innerHTML=F.slice(0,lim).map(p=>`<article id="a${p.id}" class="card${p.stock>0?'':' agotado'}">
-  <div class="img">${p.imagen?`<img loading="lazy" src="${esc(p.imagen)}" alt="${esc(nom(p))}">`:'Sin imagen'}</div>
-  <div class="b">${p.codigo?`<span class="cod">${esc(p.codigo)}</span>`:''}<h2>${esc(nom(p))}</h2><span class="pr">${p.precio>0?money(p.precio):'Consultar precio'}</span>${p.minimo>0?`<span class="mn">Compra mínima: ${fmt(p.minimo)}</span>`:''}${!(p.precio>0)?'':p.stock>0?`<div class="add" id="k${p.id}">${ctrl(p.id)}</div>`:'<span class="sin">Sin stock</span>'}</div></article>`).join('')
-  ||`<p class="m" style="grid-column:1/-1">${P.length?'No hay productos que coincidan con la búsqueda.':'Todavía no hay productos en el catálogo.'}</p>`;
- $('mas').hidden=F.length<=lim;masObs.unobserve($('mas'));masObs.observe($('mas'))}
-// Índice A-Z: la barra (el) salta al primer producto de la letra; ir(letra) hace el salto
-const LETRAS='#ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''),letra=s=>{const c=norm(s).replace(/^[^a-z0-9]+/,'')[0]||'#';return/[a-z]/.test(c)?c.toUpperCase():'#'};
-function pintaAbc(el,F){const hay=new Set(F.map(p=>letra(p.nombre)));el.innerHTML=LETRAS.map(l=>`<b data-l="${l}"${hay.has(l)?'':' class="no"'}>${l}</b>`).join('')}
-function gestoAbc(el,ir){let ult='',t;const ver=document.createElement('div');ver.className='abc-ver';ver.hidden=true;document.body.append(ver);
- const toca=e=>{const b=document.elementFromPoint(e.clientX,e.clientY)?.closest('.abc b');if(!b||b.classList.contains('no')||b.dataset.l==ult)return;
-  ult=b.dataset.l;ver.textContent=ult;ver.hidden=false;clearTimeout(t);t=setTimeout(()=>ver.hidden=true,700);ir(ult)};
- el.addEventListener('pointerdown',e=>{ult='';el.setPointerCapture?.(e.pointerId);toca(e)});
- el.addEventListener('pointermove',e=>{if(e.buttons||e.pointerType=='touch')toca(e)});el.addEventListener('pointerup',()=>ult='')}
-let FL=[],SEC=[],sec=null;
-// Botones de sectores: solo los que tienen productos en el catálogo
-function pintaChips(){const hay=new Set(P.map(p=>p.sector_id)),L=SEC.filter(x=>hay.has(x.id));if(!L.some(x=>x.id==sec))sec=null;
- $('chips').innerHTML=`<button type="button" class="${sec?'':'on'}" onclick="eligeSec(null)">Todos</button>`+L.map(x=>`<button type="button" class="${sec==x.id?'on':''}" onclick="eligeSec(${x.id})">${esc(x.nombre)}</button>`).join('');
- $('chips').hidden=!L.length;hh()}
-function eligeSec(id){sec=id;pintaChips();busca();$('chips').querySelector('.on')?.scrollIntoView({inline:'center',block:'nearest'})}
-// Buscar: muestra los resultados desde arriba y el contador de coincidencias
-function busca(){lim=48;r();$('qx').hidden=!$('q').value;if(scrollY>0)scrollTo(0,0)}
-// Altura de la cabecera, para que el buscador quede pegado justo debajo
-const hh=()=>{const d=document.documentElement.style;d.setProperty('--hh',document.querySelector('header').offsetHeight+'px');d.setProperty('--th',document.querySelector('.top').offsetHeight+8+'px')};hh();addEventListener('resize',hh);
-function irLetra(l){const i=FL.findIndex(p=>letra(p.nombre)==l);if(i<0)return;if(i>=lim){lim=i+48;r()}$('a'+FL[i].id)?.scrollIntoView({block:'start'})}
-gestoAbc($('abc'),irLetra);
-// Al acercarse al final se cargan más productos solos, sin botón
-const masObs=new IntersectionObserver(e=>{if(e[0].isIntersecting&&!$('mas').hidden){lim+=48;r()}},{rootMargin:'800px'});
-/* ---------- carrito ---------- */
-// {id: cantidad}. Queda guardado en el teléfono o la computadora del cliente hasta que lo envía.
-const leeLS=k=>{try{return localStorage.getItem(k)}catch{return null}},guardaLS=(k,v)=>{try{localStorage.setItem(k,v)}catch{}};
-const fmt=n=>Number(n).toLocaleString('de-DE',{maximumFractionDigits:2});
-let C={};try{C=JSON.parse(leeLS('carrito')||'{}')||{}}catch{}
-// Controles de cada tarjeta: "Agregar" o, si ya está en el carrito, − cantidad +
-const ctrl=id=>C[id]?`<div class="step"><button type="button" class="s" title="Quitar uno" onclick="suma(${id},-1)">−</button><input type="number" min="0" step="any" inputmode="decimal" value="${C[id]}" aria-label="Cantidad" onfocus="this.select()" onchange="ponCant(${id},this.value)"><button type="button" title="Agregar uno" onclick="suma(${id},1)">+</button></div>`:`<button type="button" class="agr" onclick="suma(${id},1)">+ Agregar</button>`;
-const lineasCar=()=>Object.keys(C).map(id=>({p:P.find(x=>x.id==id),c:C[id]})).filter(l=>l.p&&l.p.precio>0);
-// Compra mínima: "Agregar" pone el mínimo y "−" desde el mínimo lo quita del carrito
-const minDe=id=>Math.max(1,+P.find(x=>x.id==id)?.minimo||0);
-function suma(id,d){const c=+C[id]||0,m=minDe(id);ponCant(id,!c&&d>0?m:c+d<m?0:c+d)}
-function ponCant(id,v){let n=parseFloat(String(v).replace(',','.'));const m=minDe(id);
- if(n>0&&n<m){n=m;alert(`Este producto tiene compra mínima de ${fmt(m)} unidades.`)}
- if(n>0)C[id]=Math.round(n*100)/100;else delete C[id];
- guardaLS('carrito',JSON.stringify(C));const k=$('k'+id);if(k)k.innerHTML=ctrl(id);pintaCar()}
-// Número del botón y, si está abierta, la lista del carrito. Se quitan los productos que ya no están en el catálogo.
-function pintaCar(){if(P.length){let cambio=false;for(const id in C)if(!P.some(x=>x.id==id)){delete C[id];cambio=true}if(cambio)guardaLS('carrito',JSON.stringify(C))}
- const L=lineasCar(),n=P.length?L.length:Object.keys(C).length;$('nb').textContent=n;$('nb').hidden=!n;if(!$('dcar').open||!$('cok').hidden)return;
- $('cl').innerHTML=L.map(({p,c})=>`<div><span class="nm">${esc(nom(p))}<small>${p.codigo?esc(p.codigo)+' · ':''}${money(p.precio)} c/u${p.minimo>0?` · mínimo ${fmt(p.minimo)}`:''}</small></span>
-  <span class="sb">${money(c*p.precio)}</span><div class="st">${ctrl(p.id)}</div>
-  <button type="button" class="s" style="justify-self:end" title="Quitar del carrito" onclick="ponCant(${p.id},0)">✕</button>
-  ${c>p.stock?`<span class="q">${p.stock>0?'Hay menos stock que lo pedido: te confirmamos la cantidad.':'Ahora sin stock: te confirmamos si llega.'}</span>`:''}</div>`).join('')
-  ||'<p class="m">Tu carrito está vacío. Tocá <b>+ Agregar</b> en los productos que quieras presupuestar.</p>';
- $('ctot').textContent='Total estimado: '+money(L.reduce((s,l)=>s+l.c*l.p.precio,0));$('cdat').hidden=!n}
-function abrirCarrito(){$('cform').hidden=false;$('cok').hidden=true;$('cn').value=leeLS('car_nombre')||'';$('ct').value=leeLS('car_tel')||'';$('dcar').showModal();pintaCar()}
-function vaciar(){if(confirm('¿Vaciar el carrito?')){C={};guardaLS('carrito','{}');r();pintaCar()}}
-async function enviar(e){e.preventDefault();const L=lineasCar();if(!L.length)return;
- const cli=$('cn').value.trim(),tel=$('ct').value.trim(),nota=$('cc').value.trim();if(!cli||!tel)return;
- guardaLS('car_nombre',cli);guardaLS('car_tel',tel);const b=$('benv');b.disabled=true;b.textContent='Enviando…';
- const{data,error}=await sb.rpc('enviar_solicitud',{p_cliente:cli,p_telefono:tel,p_nota:nota,p_lineas:L.map(l=>({id:l.p.id,cantidad:l.c}))});
- b.disabled=false;b.textContent='Enviar pedido de presupuesto';
- if(error)return alert(error.code=='PGRST202'?'El carrito todavía no está activado. Avisanos por WhatsApp, por favor.':'No se pudo enviar el pedido: '+error.message);
- // Mensaje para avisar por WhatsApp (opcional: el pedido ya quedó guardado)
- const txt=`Hola, soy ${cli}. Envié el pedido de presupuesto Nº ${data.id} desde el catálogo:\n`+L.map(l=>`• ${fmt(l.c)} × ${nom(l.p)}`).join('\n')+(nota?`\nComentario: ${nota}`:'');
- $('okWa').href='https://wa.me/'+(CFG.WHATSAPP||'')+'?text='+encodeURIComponent(txt);$('okWa').hidden=!CFG.WHATSAPP;
- $('okT').textContent=`¡Pedido Nº ${data.id} enviado!`;$('okTel').textContent=tel;
- $('okFalta').hidden=!data.falta;
- C={};guardaLS('carrito','{}');$('cc').value='';$('cform').hidden=true;$('cok').hidden=false;r();pintaCar();revisa()}
-pintaCar();
-// Cada 10 s pregunta si hubo cambios en administración; solo entonces recarga los productos
-let ver;
-async function revisa(){const{data}=await sb.from('cambios').select('ts').eq('id',1).maybeSingle();const v=data?.ts;if(!v||v!==ver){ver=v;load()}}
-revisa();setInterval(()=>{if(!document.hidden)revisa()},10000);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)revisa()});
-</script></body></html>
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DELFI — Zapatillas y ojotas</title>
+  <meta name="description" content="Catálogo de zapatillas y ojotas de DELFI. Elegí tu talle y pedilo por WhatsApp.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+  <div class="aviso" id="aviso-demo" hidden>Modo prueba: estos productos son de ejemplo.</div>
+
+  <header class="cabecera">
+    <div class="logo">DEL<span>FI</span></div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <a class="btn chico" href="admin.html">🔒 Ingresar</a>
+      <button class="btn chico" id="btn-carrito" type="button" aria-label="Mi pedido">🛍️ <span class="solo-pc">Mi pedido</span> <span class="contador" id="contador">0</span></button>
+    </div>
+  </header>
+
+  <section class="hero">
+    <h1>Zapatillas y ojotas para toda la familia 💕</h1>
+    <p>Elegí el modelo y tu talle, y pedilo por WhatsApp.</p>
+  </section>
+
+  <section class="filtros">
+    <div class="chips" id="f-cat">
+      <button class="chip activo" data-cat="">Todo</button>
+      <button class="chip" data-cat="zapatilla">👟 Zapatillas</button>
+      <button class="chip" data-cat="ojota">🩴 Ojotas</button>
+    </div>
+    <div class="fila">
+      <input id="f-buscar" type="search" placeholder="🔎 Buscar…" aria-label="Buscar">
+      <select id="f-talle" aria-label="Tu talle"><option value="">Todos los talles</option></select>
+    </div>
+  </section>
+
+  <main class="grilla" id="grilla"><p class="vacio">Cargando…</p></main>
+
+  <footer style="text-align:center;margin-top:-80px;padding:10px 16px 110px;color:var(--gris);font-weight:700;font-size:.9rem">
+    DELFI · Zapatillas y ojotas
+  </footer>
+
+  <div class="barra-carrito" id="barra-carrito" hidden>
+    <button class="btn primario grande" id="btn-barra" type="button"></button>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+  <script src="comun.js"></script>
+  <script src="db.js"></script>
+  <script>
+    const CFG = window.DELFI_CONFIG;
+    const E = { productos: [], cat: '', q: '', talle: '' };
+    const CLAVE = 'delfi_carrito_v2';
+    let carrito = [];
+    try { carrito = JSON.parse(localStorage.getItem(CLAVE)) || []; } catch (e) { carrito = []; }
+    const guardarCarrito = () => { try { localStorage.setItem(CLAVE, JSON.stringify(carrito)); } catch (e) {} actualizarCarrito(); };
+    const totalCarrito = () => carrito.reduce((s, i) => s + i.precio * i.cantidad, 0);
+
+    async function iniciar() {
+      if (DB.modo === 'demo') $('#aviso-demo').hidden = false;
+      try {
+        E.productos = await DB.productos.listar({ soloVisibles: true });
+      } catch (err) {
+        $('#grilla').innerHTML = '<p class="vacio">No se pudo cargar el catálogo. Probá de nuevo en un rato.</p>';
+        return;
+      }
+      const talles = [...new Set(E.productos.flatMap(p => p.talles || []))].sort(ordenTalle);
+      $('#f-talle').insertAdjacentHTML('beforeend', talles.map(t => `<option>${esc(t)}</option>`).join(''));
+      dibujar();
+      actualizarCarrito();
+    }
+
+    function dibujar() {
+      const q = E.q.toLowerCase();
+      const lista = E.productos.filter(p =>
+        (!E.cat || p.categoria === E.cat) &&
+        (!q || p.nombre.toLowerCase().includes(q)) &&
+        (!E.talle || (p.talles || []).includes(E.talle)));
+      $('#grilla').innerHTML = lista.length ? lista.map(p => `
+        <button class="card" type="button" data-id="${p.id}">
+          ${fotoHTML(p, 'foto')}
+          <div class="info">
+            <span class="nombre">${esc(p.nombre)}</span>
+            <span class="precio">${fmt(p.precio)}</span>
+            <span class="talles">${esc(textoTalles(p.talles))}</span>
+          </div>
+        </button>`).join('')
+        : `<p class="vacio">${E.productos.length ? 'No encontramos productos con ese filtro.' : 'Muy pronto vas a ver nuestros productos acá 💕'}</p>`;
+    }
+
+    function verProducto(p) {
+      const colores = listaColores(p);
+      const talles = p.talles || [];
+      const sel = { color: colores.length === 1 ? colores[0] : '', talle: talles.includes(E.talle) ? E.talle : '', cant: 1 };
+      const m = abrirModal(`
+        ${fotoHTML(p, 'detalle-foto')}
+        <h2>${esc(p.nombre)}</h2>
+        <div class="precio" style="font-size:1.5rem">${fmt(p.precio)}</div>
+        ${p.descripcion ? `<p class="muted" style="font-weight:600">${esc(p.descripcion)}</p>` : ''}
+        ${colores.length > 1 ? `<label>Color</label><div class="chips" id="d-colores"></div>` : colores.length ? `<p><strong>Color:</strong> ${esc(colores[0])}</p>` : ''}
+        ${talles.length ? `<label>Talle</label><div class="chips" id="d-talles"></div>` : ''}
+        <label>Cantidad</label>
+        <div class="cantidad"><button type="button" data-c="-1" aria-label="Menos">−</button><span id="d-cant">1</span><button type="button" data-c="1" aria-label="Más">+</button></div>
+        <div class="modal-pie"><button class="btn primario grande" id="d-agregar" type="button"></button></div>`);
+      const pintar = () => {
+        if (colores.length > 1) $('#d-colores', m).innerHTML = colores.map(c => `<button type="button" class="chip ${c === sel.color ? 'activo' : ''}" data-color="${esc(c)}">${esc(c)}</button>`).join('');
+        if (talles.length) $('#d-talles', m).innerHTML = talles.map(t => `<button type="button" class="chip ${t === sel.talle ? 'activo' : ''}" data-talle="${esc(t)}">${esc(t)}</button>`).join('');
+        $('#d-cant', m).textContent = sel.cant;
+        const falta = (talles.length && !sel.talle) ? 'Elegí tu talle' : (colores.length > 1 && !sel.color) ? 'Elegí el color' : '';
+        $('#d-agregar', m).textContent = falta || `Agregar al pedido · ${fmt(p.precio * sel.cant)}`;
+        $('#d-agregar', m).disabled = !!falta;
+      };
+      m.addEventListener('click', e => {
+        const b = e.target.closest('button');
+        if (!b) return;
+        if (b.dataset.color !== undefined) { sel.color = b.dataset.color; pintar(); }
+        else if (b.dataset.talle !== undefined) { sel.talle = b.dataset.talle; pintar(); }
+        else if (b.dataset.c) { sel.cant = Math.max(1, Math.min(20, sel.cant + Number(b.dataset.c))); pintar(); }
+        else if (b.id === 'd-agregar') {
+          const ya = carrito.find(i => i.id === p.id && i.talle === sel.talle && i.color === sel.color);
+          if (ya) ya.cantidad += sel.cant;
+          else carrito.push({ id: p.id, nombre: p.nombre, categoria: p.categoria, foto_url: p.foto_url, precio: Number(p.precio), talle: sel.talle, color: sel.color, cantidad: sel.cant });
+          guardarCarrito();
+          cerrarModal();
+          toast('¡Agregado a tu pedido! 💕');
+        }
+      });
+      pintar();
+    }
+
+    function actualizarCarrito() {
+      const n = carrito.reduce((s, i) => s + i.cantidad, 0);
+      $('#contador').textContent = n;
+      $('#barra-carrito').hidden = !n;
+      $('#btn-barra').textContent = `Ver mi pedido (${n}) · ${fmt(totalCarrito())}`;
+    }
+
+    function verCarrito() {
+      if (!carrito.length) { toast('Todavía no agregaste nada'); return; }
+      const m = abrirModal(`<h2>Mi pedido</h2><div id="c-items"></div>
+        <div class="total-fila"><span>Total</span><span id="c-total"></span></div>
+        <form id="c-form">
+          <label for="c-nombre">Tu nombre</label><input id="c-nombre" required autocomplete="name">
+          <div class="modal-pie"><button class="btn verde grande" type="submit">💬 Enviar pedido por WhatsApp</button></div>
+        </form>`);
+      const pintar = () => {
+        if (!carrito.length) { cerrarModal(); return; }
+        $('#c-items', m).innerHTML = carrito.map((i, k) => `<div class="item-carrito">
+          ${fotoHTML(i, 'mini')}
+          <div class="txt"><strong>${esc(i.nombre)}</strong>
+            <div class="muted">${i.talle ? 'Talle ' + esc(i.talle) : ''}${i.talle && i.color ? ' · ' : ''}${esc(i.color)}</div>
+            <div>${fmt(i.precio * i.cantidad)}</div></div>
+          <div class="cantidad"><button type="button" data-k="${k}" data-c="-1" aria-label="Menos">−</button><span>${i.cantidad}</span><button type="button" data-k="${k}" data-c="1" aria-label="Más">+</button></div>
+        </div>`).join('');
+        $('#c-total', m).textContent = fmt(totalCarrito());
+      };
+      m.addEventListener('click', e => {
+        const b = e.target.closest('button[data-k]');
+        if (!b) return;
+        const i = carrito[b.dataset.k];
+        i.cantidad += Number(b.dataset.c);
+        if (i.cantidad <= 0) carrito.splice(b.dataset.k, 1);
+        guardarCarrito();
+        pintar();
+      });
+      $('#c-form', m).addEventListener('submit', e => {
+        e.preventDefault();
+        const numero = String(CFG.WHATSAPP || '').replace(/\D/g, '');
+        if (!numero) { toast('Falta poner el WhatsApp del local en config.js', 'error'); return; }
+        const nombre = $('#c-nombre', m).value.trim();
+        const texto = `¡Hola ${CFG.NOMBRE}! Soy ${nombre} y quiero pedir:\n` +
+          carrito.map(i => `• ${i.nombre}${i.talle ? ' — talle ' + i.talle : ''}${i.color ? ', ' + i.color : ''} x${i.cantidad} (${fmt(i.precio * i.cantidad)})`).join('\n') +
+          `\nTotal: ${fmt(totalCarrito())}`;
+        window.open(`https://wa.me/${numero}?text=${encodeURIComponent(texto)}`, '_blank');
+        carrito = [];
+        guardarCarrito();
+        abrirModal(`<h2>¡Gracias, ${esc(nombre)}! 💕</h2>
+          <p style="font-weight:600">Se abrió WhatsApp con tu pedido. Solo tenés que apretar <strong>Enviar</strong> y te respondemos enseguida.</p>
+          <div class="modal-pie"><button class="btn primario" type="button" data-cerrar>Seguir mirando</button></div>`);
+      });
+      pintar();
+    }
+
+    $('#f-cat').addEventListener('click', e => {
+      const b = e.target.closest('[data-cat]');
+      if (!b) return;
+      E.cat = b.dataset.cat;
+      $$('#f-cat .chip').forEach(c => c.classList.toggle('activo', c === b));
+      dibujar();
+    });
+    $('#f-buscar').addEventListener('input', e => { E.q = e.target.value; dibujar(); });
+    $('#f-talle').addEventListener('change', e => { E.talle = e.target.value; dibujar(); });
+    $('#grilla').addEventListener('click', e => {
+      const c = e.target.closest('.card');
+      if (c) verProducto(E.productos.find(p => p.id === c.dataset.id));
+    });
+    $('#btn-carrito').addEventListener('click', verCarrito);
+    $('#btn-barra').addEventListener('click', verCarrito);
+    iniciar();
+  </script>
+</body>
+</html>
