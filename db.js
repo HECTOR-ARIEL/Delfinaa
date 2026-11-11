@@ -45,6 +45,16 @@ const DB = (() => {
     },
     async login(email, password) { if (modo === 'supabase') chk(await sb().auth.signInWithPassword({ email, password })); },
     async logout() { if (modo === 'supabase') await sb().auth.signOut(); },
+    // Manda el mail con el enlace para poner una clave nueva
+    async recuperar(email, volverA) {
+      if (modo !== 'supabase') throw new Error('En modo prueba no hace falta clave.');
+      chk(await sb().auth.resetPasswordForEmail(email, { redirectTo: volverA }));
+    },
+    // Guarda la clave nueva (después de tocar el enlace del mail)
+    async nuevaClave(password) {
+      if (modo !== 'supabase') return;
+      chk(await sb().auth.updateUser({ password }));
+    },
   };
 
   const productos = {

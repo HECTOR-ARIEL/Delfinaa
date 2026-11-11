@@ -25,6 +25,34 @@
         <label for="l-email">Email</label><input id="l-email" type="email" required autocomplete="username">
         <label for="l-pass">Contraseña</label><input id="l-pass" type="password" required autocomplete="current-password">
         <div class="modal-pie"><button class="btn primario grande" type="submit">Entrar</button></div>
+        <p style="text-align:center;margin:14px 0 0"><button class="btn chico" type="button" id="btn-olvide">🔑 Me olvidé la clave</button></p>
+      </form>
+
+      <!-- Me olvidé la clave: pedir el mail -->
+      <form id="form-olvide" hidden>
+        <p style="font-weight:700;text-align:center">Te mandamos un mail con un enlace para poner una clave nueva.</p>
+        <label for="o-email">Tu email</label><input id="o-email" type="email" required autocomplete="username">
+        <div class="modal-pie"><button class="btn primario grande" type="submit">📩 Mandarme el mail</button></div>
+        <p style="text-align:center;margin:14px 0 0"><button class="btn chico" type="button" data-volver>← Volver</button></p>
+      </form>
+
+      <!-- Mail enviado -->
+      <div id="olvide-ok" hidden>
+        <p style="font-size:2.4rem;text-align:center;margin:8px 0">📬</p>
+        <p style="font-weight:800;text-align:center">¡Listo! Revisá tu correo.</p>
+        <p class="muted" style="font-weight:700;text-align:center">Abrí el mail y tocá el enlace. Si no lo ves, fijate en <b>Spam</b> o <b>Promociones</b>. Puede tardar un par de minutos.</p>
+        <p style="text-align:center;margin:14px 0 0"><button class="btn chico" type="button" data-volver>← Volver</button></p>
+      </div>
+
+      <!-- Poner la clave nueva (al volver desde el mail) -->
+      <form id="form-nueva" hidden>
+        <p style="font-weight:800;text-align:center">Poné tu clave nueva</p>
+        <input type="email" id="n-email" autocomplete="username" hidden>
+        <label for="n-pass">Clave nueva <span class="ayuda">— 6 letras o números como mínimo</span></label>
+        <input id="n-pass" type="password" required minlength="6" autocomplete="new-password">
+        <label for="n-pass2">Repetila</label>
+        <input id="n-pass2" type="password" required minlength="6" autocomplete="new-password">
+        <div class="modal-pie"><button class="btn primario grande" type="submit">💾 Guardar la clave nueva</button></div>
       </form>
     </div>
   </div>
@@ -50,16 +78,64 @@
   <script src="config.js?v=3"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
   <script src="comun.js?v=3"></script>
-  <script src="db.js?v=3"></script>
+  <script src="db.js?v=4"></script>
   <script>
     let productos = [];
+    // ¿Llegó desde el enlace del mail de "Me olvidé la clave"?
+    const vieneDelMail = /type=recovery/.test(location.hash);
+    const enlaceVencido = /error_code=otp_expired|error=access_denied/.test(location.hash);
 
     async function iniciar() {
-      if (DB.modo === 'demo') { $('#aviso-demo').hidden = false; $('#btn-salir').hidden = true; }
+      if (DB.modo === 'demo') { $('#aviso-demo').hidden = false; $('#btn-salir').hidden = true; $('#btn-olvide').hidden = true; }
       let ses = null;
       try { ses = await DB.auth.sesion(); } catch (err) { toast(err.message, 'error'); }
-      if (ses) mostrar(); else $('#login').hidden = false;
+      if (vieneDelMail && ses) {
+        $('#n-email').value = ses.user?.email || '';
+        verLogin('#form-nueva');
+      } else if (ses) {
+        mostrar();
+      } else {
+        if (enlaceVencido) { toast('Ese enlace ya venció. Pedí otro mail con “Me olvidé la clave”.', 'error'); history.replaceState(null, '', location.pathname); }
+        verLogin('#form-login');
+      }
     }
+
+    // Muestra una sola de las partes de la caja de entrar
+    function verLogin(cual) {
+      $('#login').hidden = false;
+      ['#form-login', '#form-olvide', '#olvide-ok', '#form-nueva'].forEach(s => { $(s).hidden = s !== cual; });
+    }
+    $('#btn-olvide').addEventListener('click', () => { $('#o-email').value = $('#l-email').value.trim(); verLogin('#form-olvide'); });
+    $$('[data-volver]').forEach(b => b.addEventListener('click', () => verLogin('#form-login')));
+    $('#form-olvide').addEventListener('submit', async e => {
+      e.preventDefault();
+      const boton = $('#form-olvide button[type="submit"]');
+      boton.disabled = true; boton.textContent = 'Mandando…';
+      try {
+        await DB.auth.recuperar($('#o-email').value.trim(), location.origin + location.pathname);
+        verLogin('#olvide-ok');
+      } catch (err) {
+        toast(/rate|seconds|limit/i.test(err.message) ? 'Ya se mandó un mail hace poco. Esperá un rato y probá de nuevo.' : 'No se pudo mandar el mail. Probá de nuevo en un rato.', 'error');
+      }
+      boton.disabled = false; boton.textContent = '📩 Mandarme el mail';
+    });
+    $('#form-nueva').addEventListener('submit', async e => {
+      e.preventDefault();
+      const clave = $('#n-pass').value;
+      if (clave !== $('#n-pass2').value) { toast('Las dos claves no son iguales. Escribilas de nuevo.', 'error'); return; }
+      const boton = $('#form-nueva button[type="submit"]');
+      boton.disabled = true; boton.textContent = 'Guardando…';
+      try {
+        await DB.auth.nuevaClave(clave);
+        history.replaceState(null, '', location.pathname);
+        $('#login').hidden = true;
+        toast('¡Clave cambiada! Ya podés usarla para entrar ✨');
+        mostrar();
+      } catch (err) {
+        toast('No se pudo guardar la clave. Probá con otra o pedí otro mail.', 'error');
+        boton.disabled = false; boton.textContent = '💾 Guardar la clave nueva';
+      }
+    });
     $('#form-login').addEventListener('submit', async e => {
       e.preventDefault();
       try {
