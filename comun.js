@@ -10,7 +10,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 // Talles para elegir con un toque
 const TALLES = {
   zapatilla: Array.from({ length: 30 }, (_, i) => String(17 + i)),               // 17 al 46
-  ojota: Array.from({ length: 15 }, (_, i) => `${17 + i * 2}/${18 + i * 2}`),     // 17/18 al 45/46
+  ojota: Array.from({ length: 30 }, (_, i) => String(17 + i)),                   // 17 al 46, de a uno
 };
 
 function ordenTalle(a, b) {
